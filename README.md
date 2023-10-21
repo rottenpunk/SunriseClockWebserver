@@ -14,7 +14,7 @@ on Amazon at: [BIOS Lighting Circadian A19 LED Light Bulb](https://www.amazon.co
 
 The Sunrise Clock has two parts to it, the Sunrise Clock Dimmer and the Sunrise Clock Webserver.
 
-### The Sunrise Clock Dimmer (this repository) 
+### The Sunrise Clock Dimmer (in the SunriseClockDimmer repository)  
 
 This is a Spark Fun Pro Micro board (or equivilent), which manages the actual dimming. The Sunrise Clock Webserver
 communicates to this board through a serial connection to send commands to it:
@@ -34,6 +34,6 @@ communicates to this board through a serial connection to send commands to it:
 
 For debugging purposes, you can type these commands into Arduino's USB serial monitor.
 
-### The Sunrise Clock Webserver (in the SunriseClockDimmer repository)
+### The Sunrise Clock Webserver (this repository)
 This is an ESP-01S board. This board has an ESP8266 chip on it and 4 meg of memory.
 
