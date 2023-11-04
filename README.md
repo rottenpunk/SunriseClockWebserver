@@ -37,3 +37,15 @@ For debugging purposes, you can type these commands into Arduino's USB serial mo
 ### The Sunrise Clock Webserver (this repository)
 This is an ESP-01S board. This board has an ESP8266 chip on it and 4 meg of memory.
 
+Arduino board setting for the ESP-01s board:
+Board: "Generic ESP8266 Module"
+Builtin LED: "2"
+...
+Flash Size: "$MB (FS:3MB OTA:~512KB)"
+...
+
+
+Some of the other settings can be set to various things depending on how you want to use it.  For example, you may want to set the 
+Erase Flash setting to erase the WiFi Settings on upload.
+
+
