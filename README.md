@@ -48,4 +48,5 @@ Flash Size: "$MB (FS:3MB OTA:~512KB)"
 Some of the other settings can be set to various things depending on how you want to use it.  For example, you may want to set the 
 Erase Flash setting to erase the WiFi Settings on upload.
 
-
+### Sunrise Clock Diagram
+![](Sunrise_Clock_Diagram.JPG)
