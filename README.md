@@ -41,7 +41,7 @@ Arduino board setting for the ESP-01s board:
 Board: "Generic ESP8266 Module"
 Builtin LED: "2"
 ...
-Flash Size: "$MB (FS:3MB OTA:~512KB)"
+Flash Size: "4MB (FS:3MB OTA:~512KB)"
 ...
 
 
