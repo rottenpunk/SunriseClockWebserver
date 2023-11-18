@@ -11,6 +11,8 @@
 #include <time.h>
 #include "webpage.h"
 
+#define DEFAULT_DEVICE_NAME "SunriseClock"  // once mDNS works, use this appended with ".local" in web browser.
+
 #define PREFERRED_NTP_SERVER "pool.ntp.org" 
 
 #define TIMEZONE_LOSANGELES 0
@@ -68,7 +70,8 @@ void setup() {
     // if it does not connect it starts an access point with the specified name
     // here  "AutoConnectAP"
     // and goes into a blocking loop awaiting configuration
-    sprintf(dev_name, "ESP%06X", ESP.getChipId()); 
+    //sprintf(dev_name, "ESP%06X", ESP.getChipId()); 
+    strcpy(dev_name, DEFAULT_DEVICE_NAME); 
     wifiManager.autoConnect(dev_name);
     Serial.print("Device name: ");
     Serial.println(dev_name);
@@ -85,6 +88,9 @@ void setup() {
   
     server.begin();
     Serial.println("HTTP server started");
+
+    // Add service to MDNS...
+    MDNS.addService("http", "tcp", 80);
  
 }
 
@@ -94,6 +100,8 @@ void loop()
     struct tm * timeinfo;   // Temporary to test time();
     char buffer[80];        // Temporary to test time();
     static time_t last_time_display = 0; // Temporary to test time();
+
+    MDNS.update();
 
     time(&rawtime);
     if( last_time_display < rawtime && (rawtime % 60) == 0 ) {     // Only display once a minute.
