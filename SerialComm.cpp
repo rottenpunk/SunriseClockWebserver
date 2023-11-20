@@ -1,6 +1,8 @@
 //-----------------------------------------------------------------------------
 // Manage communication link to send commands to dimmer and recieve a
-// response back.
+// response back. There is documentation on the commands and responses
+// between the webserver and the dimmer in the README.md in the dimmer's
+// GitHub repository (SunriseClockDimmer)...
 //-----------------------------------------------------------------------------
 #include <cstdbool>
 #include <cstdio>
@@ -16,8 +18,10 @@ static SerialBuffer serialBuffer;          // Command buffer used for collecting
 #define MAX_TEMP_BUFFER  50         // Size of a temp buffer for building part of cmd.     
 
 //-----------------------------------------------------------------------------
-// Read input from a serial port and build command line buffer. Return TRUE if
-// we have a full command to process (received a CRLF - we'll ignore CRs)...
+// Read a character from a serial port and add to the input buffer. Return TRUE 
+// if we have a full response to process (received a CRLF - we'll ignore CR)...
+// This is pretty much the same routine used in the dimmer to read in a
+// command line one character at a time until we get a CRLF...
 //-----------------------------------------------------------------------------
 bool read_serial_input( SerialBuffer *serBuff )
 {
@@ -30,7 +34,7 @@ bool read_serial_input( SerialBuffer *serBuff )
     if (serBuff->index == 0 && c != '#') {
         // Ignore anything before the '#' (which could be a '>').
     } else if (c == '\r') {             // LF?
-        // null terminate command line. 
+        // null terminate line. 
         serBuff->buffer[serBuff->index] = 0;  
         serBuff->index = 0;      // reset command line index.
         return true;
