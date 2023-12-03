@@ -33,7 +33,7 @@ R"=====(
             </div>
             <div class="form-group">
                 <label for="brightnessSlider">Brightness (0-100):</label>
-                <input type="range" class="form-control-range" id="brightnessSlider" min="0" max="100">
+                <input type="range" class="form-control-range" id="brightnessSlider" min="0" max="100" value="0">
             </div>
             <div class="form-group">
                 <label for="alarmTime">Set alarm time:</label>
@@ -72,6 +72,8 @@ R"=====(
             console.log('Brightness:', brightnessValue);
             console.log('Set alarm time:', alarmTimeValue);
             console.log('Wake up time in minutes:', wakeUpTimeValue);
+
+            res.send('ipAddress?formVariables=formVariables)
         }
     </script>
 </body>
