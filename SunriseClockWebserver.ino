@@ -1,19 +1,25 @@
- /*********
-  Rui Santos
-  Complete project details at https://randomnerdtutorials.com  
-*********/
-
+//-----------------------------------------------------------------------------
+//  Sunrise Clock Webserver
+//
+//  This is the webserver for the Sunrise Clock Webserver. 
+//
+//  See: https://github.com/rottenpunk/SunriseClockWebserver
+//  and  https://github.com/rottenpunk/SunriseClockDimmer
+//
+//  Original code by Rui Santos at https://randomnerdtutorials.com  
+//-----------------------------------------------------------------------------
 #include <ESP8266WiFi.h>
-//#include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>         // https://github.com/tzapu/WiFiManager
 #include <ESP8266mDNS.h>
 #include <time.h>
+#include <stdbool.h>
+#include "SunriseClockWebserver.h"
 #include "webpage.h"
 
-#define DEFAULT_DEVICE_NAME "SunriseClock"  // once mDNS works, use this appended with ".local" in web browser.
 
-#define PREFERRED_NTP_SERVER "pool.ntp.org" 
+#define DEFAULT_DEVICE_NAME  "SunriseClock"  // Use this appended with ".local" in web browser.
+#define PREFERRED_NTP_SERVER "pool.ntp.org"  
 
 #define TIMEZONE_LOSANGELES 0
 #define TIMEZONE_PORTLAND   1
@@ -27,32 +33,16 @@ const char *time_zones[] = {
     "EST5EDT,M3.2.0,M11.1.0",   // TIMEZONE_KEYWEST
 };
 
-time_t now;                     // Seconds since Epoch (1970) - UTC
-tm tm;                          // Holds time information in a more convenient way
-
 
 // Set web server port number to 80
 // WiFiServer server(80);
 ESP8266WebServer server(80);
 
-// Variable to store the HTTP request
-String header;
-
-// Assign output variables to GPIO pins
-uint8_t LED1pin = 0;
-bool LED1status = LOW;
-uint8_t LED2pin = 2;
-bool LED2status = LOW;
-
 char dev_name[20];
-
 
 void setup() {
   
-    Serial.begin(115200);
-
-    pinMode(LED1pin, OUTPUT);
-    pinMode(LED2pin, OUTPUT);
+    Serial.begin(9600);    // We will be talking to dimmer.
 
     configTime( time_zones[TIMEZONE_LOSANGELES], PREFERRED_NTP_SERVER);
   
@@ -67,11 +57,10 @@ void setup() {
     //wifiManager.setAPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
 
     // fetches ssid and pass from eeprom and tries to connect
-    // if it does not connect it starts an access point with the specified name
-    // here  "AutoConnectAP"
-    // and goes into a blocking loop awaiting configuration
+    // if it does not connect it starts an access point with the 
+    // device name and goes into a blocking loop awaiting configuration
     //sprintf(dev_name, "ESP%06X", ESP.getChipId()); 
-    strcpy(dev_name, DEFAULT_DEVICE_NAME); 
+    strcpy(dev_name, DEFAULT_DEVICE_NAME);
     wifiManager.autoConnect(dev_name);
     Serial.print("Device name: ");
     Serial.println(dev_name);
@@ -80,34 +69,48 @@ void setup() {
     
     if (!MDNS.begin(dev_name)) {          // Start the mDNS responder for esp8266.local
         Serial.println("Error setting up MDNS responder!");
+    } else {
+        MDNS.addService("http", "tcp", 80);  // Add service to MDNS...
+        Serial.println("mDNS responder started");
     }
-    Serial.println("mDNS responder started");
-
     server.on("/", handleWebpage);
     server.onNotFound(handle_NotFound);
   
     server.begin();
     Serial.println("HTTP server started");
+    
+    while (time(NULL) == 0) {
+        Serial.println("Waiting for NTP time update");
+        delay(1000);  // Wait a second until NTP has a chance to get time.
+    }
 
-    // Add service to MDNS...
-    MDNS.addService("http", "tcp", 80);
- 
+    sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
+    sendCommand(COMMAND_ID_Q, 0);   // Debug.
+    sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.   
+    sendCommand(COMMAND_ID_A, 40221);   // set alarm to 11:10:21
+    delay(1000);
+    sendCommand(COMMAND_ID_S, 80);  // test setting on light at dim level 80.
+    delay(1000);
+    sendCommand(COMMAND_ID_S, 130); // test setting on light at dim level 130.
+    delay(1000);
+    sendCommand(COMMAND_ID_F, 0);   // Light off.
 }
 
 void loop()
 {
-    time_t rawtime;         // Temporary to test time();
-    struct tm * timeinfo;   // Temporary to test time();
-    char buffer[80];        // Temporary to test time();
-    static time_t last_time_display = 0; // Temporary to test time();
+    time_t        rawtime;       // Temporary to test time();
+    struct tm *   timeinfo;      // Temporary to test time();
+    char          buffer[80];    // Temporary to test time();
+    static time_t last_time = 0; // Temporary to test time();
 
     MDNS.update();
 
     time(&rawtime);
-    if( last_time_display < rawtime && (rawtime % 60) == 0 ) {     // Only display once a minute.
-        last_time_display = rawtime;
+    // Debug: Display every 10 minutes...
+    if (last_time < rawtime && (rawtime % (60 * 10)) == 0) {   
+        last_time = rawtime;
         timeinfo = localtime (&rawtime);     
-        strftime (buffer, sizeof(buffer), " Now it's %I:%M%p", timeinfo);
+        strftime (buffer, sizeof(buffer), "Now it's %I:%M%p", timeinfo);
         Serial.println(buffer);
     }
   
