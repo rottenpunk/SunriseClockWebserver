@@ -12,7 +12,7 @@
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>         // https://github.com/tzapu/WiFiManager
 #include <ESP8266mDNS.h>
-#include <WebSockets.h>
+#include <WebSocketsServer.h>
 #include <time.h>
 #include <stdbool.h>
 #include "SunriseClockWebserver.h"
@@ -125,13 +125,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
   if(type == WStype_TEXT){
     if(payload[0] == '#'){
       uint16_t brightness = (uint16_t) strtol((const char *) &payload[1], NULL, 10);
-      brightness = 1024 - brightness;
-      analogWrite(pin_led, brightness);
       Serial.print("brightness= ");
       Serial.println(brightness);
     }
-
-    else{
+    else {
       for(int i = 0; i < length; i++)
         Serial.print((char) payload[i]);
       Serial.println();
