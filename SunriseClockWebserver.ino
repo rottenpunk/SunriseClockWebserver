@@ -102,23 +102,8 @@ void setup() {
 
 void loop()
 {
-    time_t        rawtime;       // Temporary to test time();
-    struct tm *   timeinfo;      // Temporary to test time();
-    char          buffer[80];    // Temporary to test time();
-    static time_t last_time = 0; // Temporary to test time();
-
     MDNS.update();
-    webSocket.loop();
-    
-    time(&rawtime);
-    // Debug: Display every 10 minutes...
-    if (last_time < rawtime && (rawtime % (60 * 10)) == 0) {   
-        last_time = rawtime;
-        timeinfo = localtime (&rawtime);     
-        strftime (buffer, sizeof(buffer), "Now it's %I:%M%p", timeinfo);
-        Serial.println(buffer);
-    }
-  
+    webSocket.loop(); 
     server.handleClient();
 }
 
