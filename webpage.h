@@ -10,7 +10,7 @@ R"=====(
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
         .jumbotron {
-            background-image: url('sunrise.jpg'); /* Replace 'sunrise.jpg' with your image file path */
+            background-image: url('https://img.freepik.com/premium-photo/beautiful-sunrise-mountain-meadow-landscape-refreshment-with-sunshine-golden-grass_930198-1188.jpg'); /* Replace 'sunrise.jpg' with your image file path */
             background-size: cover;
             color: white;
         }
@@ -26,6 +26,10 @@ R"=====(
             <div class="form-group form-check custom-control custom-switch">
                 <input type="checkbox" class="custom-control-input" id="lightToggle" oninput="sendLightStatus()">
                 <label class="custom-control-label" for="lightToggle">Light On/Off</label>
+            </div>
+             <div class="form-group form-check custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="alarmToggle" oninput="sendAlarmStatus()">
+                <label class="custom-control-label" for="alarmToggle">Alarm On/Off</label>
             </div>
             <div class="form-group"> 
                 <label for="brightnessSlider">Brightness (0-100):</label>
@@ -54,50 +58,90 @@ R"=====(
         var Socket;
         function init() {
           
-          Socket = new WebSocket('ws://' + window.location.hostname + ':81/');
-          document.getElementById('alarmForm').addEventListener('submit', function(event) {
-            event.preventDefault(); // Prevents the default form submission
-            submitForm();
-          });
+            socket = new WebSocket('ws://' + window.location.hostname + ':81/');
+            socket.onmessage = socketRecv;
+            document.getElementById('alarmForm').addEventListener('submit', function(event) {
+                event.preventDefault(); // Prevents the default form submission
+                submitForm();
+            });
+            // Now, ask the server to send the current values of things (brightness, 
+            // alarm time, wake time)...
+            socket.send("#?");
         }
 
         // keep getting (index):71 WebSocket is already in CLOSING or CLOSED state. error
         function sendBrightness() {
             var brightness = document.getElementById("brightnessSlider").value
             if(brightness === "0") {
-              document.getElementById('lightToggle').checked = false;
+                document.getElementById('lightToggle').checked = false;
             }
             else {
-              document.getElementById('lightToggle').checked = true;
+                document.getElementById('lightToggle').checked = true;
             }
-            Socket.send('#' + brightness);
+            socket.send('#s' + brightness);
         }
         
 
         function sendLightStatus() {
-          var lightStatus = document.getElementById("lightToggle").checked
-          if (lightStatus === false) {
-            document.getElementById("brightnessSlider").value = 0;
-          } else {
-            document.getElementById("brightnessSlider").value = 50;
-          }
-          Socket.send('L' + lightStatus);
+            var lightStatus = document.getElementById("lightToggle").checked
+            var brightness;
+            
+            if (lightStatus === false) {
+                document.getElementById("brightnessSlider").value = 0;
+                brightness = 0;
+            } else {
+                document.getElementById("brightnessSlider").value = 50;
+                brightness = 50;
+            }
+            
+            socket.send('#s' + brightness);
+        }
+
+        function sendAlarmStatus() {
+            var alarmStatus = document.getElementById("alarmToggle").checked
+            var newAlarmStatus;
+            
+            if (alarmStatus === false) {
+                newAlarmStatus = 'f';                        
+            } else {
+                newAlarmStatus = 'o';                        
+            }
+             
+            socket.send('#a' + newAlarmStatus);
         }
         
         function submitForm() {
           
             alert("Alarm saved");
-            var brightnessValue = document.getElementById('brightnessSlider').value;
             var alarmTimeValue = document.getElementById('alarmTime').value;
             var wakeUpTimeValue = document.getElementById('wakeUpTime').value;
 
-            
-     
-            console.log('Brightness:', brightnessValue);
             console.log('Set alarm time:', alarmTimeValue);
             console.log('Wake up time in minutes:', wakeUpTimeValue);
 
-            Socket.send("Alarm time: " + alarmTimeValue + " | WakeUpIn: " + wakeUpTimeValue);
+            socket.send("#a" + alarmTimeValue);
+            socket.send("#w" + wakeUpTimeValue * 60);
+        }
+
+        // This function receives a status message from webserver to update onscreen values...
+        function socketRecv(event) {
+            if (event.data[0] = '#') {
+                console.log(event.data[1]);
+                console.log(event.data.substr(2));
+                switch(event.data[1]) {
+                    case 'a':
+                        break;
+                    case 's':
+                        break;
+                    case 'w':
+                        break;
+                    default:
+                        console.log("Received unknown message: " + event.data);
+                        break;
+                }
+            } else {
+                console.log("Received unknown message: " + event.data);
+            }
         }
     </script>
 </body>

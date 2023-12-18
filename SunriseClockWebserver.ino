@@ -121,19 +121,48 @@ void loop()
   
     server.handleClient();
 }
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
-  if(type == WStype_TEXT){
-    if(payload[0] == '#'){
-      uint16_t brightness = (uint16_t) strtol((const char *) &payload[1], NULL, 10);
-      Serial.print("brightness= ");
-      Serial.println(brightness);
+
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
+{
+    uint8_t buf[30];
+    
+    if(type == WStype_TEXT){
+        if(payload[0] == '#'){
+            if(payload[1] == 's') {
+                uint16_t brightness = (uint16_t) strtol((const char *) &payload[2], NULL, 10);
+                Serial.print("brightness= ");
+                Serial.println(brightness);
+                int mappedBrightness = map(brightness, 0, 100, 0, 255);
+                sendCommand(COMMAND_ID_S, mappedBrightness);  // Tell dimmer to set brightness.
+            } else if(payload[1] == 'a' && payload[2] == 'o') {
+                Serial.println("Turn on alarm");
+            } else if(payload[1] == 'a' && payload[2] == 'f') {
+                Serial.println("Turn off alarm");
+            } else if(payload[1] == 'a') {
+                Serial.print("new alarm setting = ");
+                Serial.println((char*)(&payload[2]));
+            } else if(payload[1] == 'w') {
+                uint16_t wakeTime = (uint16_t) strtol((const char *) &payload[2], NULL, 10);            
+                Serial.print("Wake time= ");
+                Serial.println(wakeTime);
+            } else if(payload[1] == '?') {   // Send back complete status (brightness, alarmtime, waketime)...
+                // write the current brightness value...
+                int size = snprintf(buf, sizeof(buf), "#s%d", brightness);
+                webSocket.broadcastTXT(buf, size); 
+                // write the current alarmtime value ("hh:mm"...
+                int size = snprintf(buf, sizeof(buf), "#s%s", brightness);
+                webSocket.broadcastTXT(buf, size); 
+                // write the current wake time value...
+                int size = snprintf(buf, sizeof(buf), "#s%d", waketime);
+                webSocket.broadcastTXT(buf, size); 
+            }
+        } else {
+            Serial.print("We recieved: ");
+            for(int i = 0; i < length; i++)
+                Serial.print((char) payload[i]);
+            Serial.println();
+        }
     }
-    else {
-      for(int i = 0; i < length; i++)
-        Serial.print((char) payload[i]);
-      Serial.println();
-    }
-  }
 }
 
 void handle_NotFound()
