@@ -16,7 +16,7 @@ R"=====(
         }
     </style>
 </head>
-<body>
+<body onload = "javascript:init()">
     <div class="jumbotron text-center">
         <h1 class="display-4">Sunrise Alarm</h1>
     </div>
@@ -24,16 +24,12 @@ R"=====(
     <div class="container mt-3">
         <form id="alarmForm">
             <div class="form-group form-check custom-control custom-switch">
-                <input type="checkbox" class="custom-control-input" id="lightToggle">
+                <input type="checkbox" class="custom-control-input" id="lightToggle" oninput="sendLightStatus()">
                 <label class="custom-control-label" for="lightToggle">Light On/Off</label>
             </div>
-            <div class="form-group form-check custom-control custom-switch">
-                <input type="checkbox" class="custom-control-input" id="alarmToggle">
-                <label class="custom-control-label" for="alarmToggle">Alarm</label>
-            </div>
-            <div class="form-group">
+            <div class="form-group"> 
                 <label for="brightnessSlider">Brightness (0-100):</label>
-                <input type="range" class="form-control-range" id="brightnessSlider" min="0" max="100">
+                <input type="range" class="form-control-range" id="brightnessSlider" min="0" max="100" value="0" oninput="sendBrightness()">
             </div>
             <div class="form-group">
                 <label for="alarmTime">Set alarm time:</label>
@@ -54,24 +50,54 @@ R"=====(
     -->
 
     <script>
-        document.getElementById('alarmForm').addEventListener('submit', function(event) {
+
+        var Socket;
+        function init() {
+          
+          Socket = new WebSocket('ws://' + window.location.hostname + ':81/');
+          document.getElementById('alarmForm').addEventListener('submit', function(event) {
             event.preventDefault(); // Prevents the default form submission
             submitForm();
-        });
+          });
+        }
 
+        // keep getting (index):71 WebSocket is already in CLOSING or CLOSED state. error
+        function sendBrightness() {
+            var brightness = document.getElementById("brightnessSlider").value
+            if(brightness === "0") {
+              document.getElementById('lightToggle').checked = false;
+            }
+            else {
+              document.getElementById('lightToggle').checked = true;
+            }
+            Socket.send('#' + brightness);
+        }
+        
+
+        function sendLightStatus() {
+          var lightStatus = document.getElementById("lightToggle").checked
+          if (lightStatus === false) {
+            document.getElementById("brightnessSlider").value = 0;
+          } else {
+            document.getElementById("brightnessSlider").value = 50;
+          }
+          Socket.send('L' + lightStatus);
+        }
+        
         function submitForm() {
-            var lightChecked = document.getElementById('lightToggle').checked;
-            var alarmChecked = document.getElementById('alarmToggle').checked;
+          
+            alert("Alarm saved");
             var brightnessValue = document.getElementById('brightnessSlider').value;
             var alarmTimeValue = document.getElementById('alarmTime').value;
             var wakeUpTimeValue = document.getElementById('wakeUpTime').value;
 
             
-            console.log('Light:', lightChecked);
-            console.log('Alarm:', alarmChecked);
+     
             console.log('Brightness:', brightnessValue);
             console.log('Set alarm time:', alarmTimeValue);
             console.log('Wake up time in minutes:', wakeUpTimeValue);
+
+            Socket.send("Alarm time: " + alarmTimeValue + " | WakeUpIn: " + wakeUpTimeValue);
         }
     </script>
 </body>

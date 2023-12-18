@@ -12,6 +12,7 @@
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>         // https://github.com/tzapu/WiFiManager
 #include <ESP8266mDNS.h>
+#include <WebSocketsServer.h>
 #include <time.h>
 #include <stdbool.h>
 #include "SunriseClockWebserver.h"
@@ -37,6 +38,7 @@ const char *time_zones[] = {
 // Set web server port number to 80
 // WiFiServer server(80);
 ESP8266WebServer server(80);
+WebSocketsServer webSocket = WebSocketsServer(81);
 
 char dev_name[20];
 
@@ -78,22 +80,24 @@ void setup() {
   
     server.begin();
     Serial.println("HTTP server started");
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
     
     while (time(NULL) == 0) {
         Serial.println("Waiting for NTP time update");
         delay(1000);  // Wait a second until NTP has a chance to get time.
     }
 
-    sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
-    sendCommand(COMMAND_ID_Q, 0);   // Debug.
-    sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.   
-    sendCommand(COMMAND_ID_A, 40221);   // set alarm to 11:10:21
-    delay(1000);
-    sendCommand(COMMAND_ID_S, 80);  // test setting on light at dim level 80.
-    delay(1000);
-    sendCommand(COMMAND_ID_S, 130); // test setting on light at dim level 130.
-    delay(1000);
-    sendCommand(COMMAND_ID_F, 0);   // Light off.
+//    sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
+//    sendCommand(COMMAND_ID_Q, 0);   // Debug.
+//    sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.   
+//    sendCommand(COMMAND_ID_A, 40221);   // set alarm to 11:10:21
+//    delay(1000);
+//    sendCommand(COMMAND_ID_S, 80);  // test setting on light at dim level 80.
+//    delay(1000);
+//    sendCommand(COMMAND_ID_S, 130); // test setting on light at dim level 130.
+//    delay(1000);
+//    sendCommand(COMMAND_ID_F, 0);   // Light off.
 }
 
 void loop()
@@ -104,7 +108,8 @@ void loop()
     static time_t last_time = 0; // Temporary to test time();
 
     MDNS.update();
-
+    webSocket.loop();
+    
     time(&rawtime);
     // Debug: Display every 10 minutes...
     if (last_time < rawtime && (rawtime % (60 * 10)) == 0) {   
@@ -116,7 +121,20 @@ void loop()
   
     server.handleClient();
 }
-
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length){
+  if(type == WStype_TEXT){
+    if(payload[0] == '#'){
+      uint16_t brightness = (uint16_t) strtol((const char *) &payload[1], NULL, 10);
+      Serial.print("brightness= ");
+      Serial.println(brightness);
+    }
+    else {
+      for(int i = 0; i < length; i++)
+        Serial.print((char) payload[i]);
+      Serial.println();
+    }
+  }
+}
 
 void handle_NotFound()
 {
