@@ -60,12 +60,18 @@ R"=====(
           
             socket = new WebSocket('ws://' + window.location.hostname + ':81/');
             socket.onmessage = socketRecv;
+            socket.onopen = onopen;
             document.getElementById('alarmForm').addEventListener('submit', function(event) {
                 event.preventDefault(); // Prevents the default form submission
                 submitForm();
             });
+            
+        }
+        
+        function onopen() {
             // Now, ask the server to send the current values of things (brightness, 
             // alarm time, wake time)...
+            console.log("websocket connection open");
             socket.send("#?");
         }
 
@@ -112,7 +118,6 @@ R"=====(
         
         function submitForm() {
           
-            alert("Alarm saved");
             var alarmTimeValue = document.getElementById('alarmTime').value;
             var wakeUpTimeValue = document.getElementById('wakeUpTime').value;
 
@@ -121,6 +126,8 @@ R"=====(
 
             socket.send("#a" + alarmTimeValue);
             socket.send("#w" + wakeUpTimeValue * 60);
+            document.getElementById("alarmToggle").checked = true; 
+            alert("Alarm saved");
         }
 
         // This function receives a status message from webserver to update onscreen values...
@@ -130,10 +137,24 @@ R"=====(
                 console.log(event.data.substr(2));
                 switch(event.data[1]) {
                     case 'a':
+                        if (event.data[2] == 'o') {
+                            document.getElementById("alarmToggle").checked = true;      
+                        } else if (event.data[2] == 'f') {
+                            document.getElementById("alarmToggle").checked = false;
+                        } else {
+                            document.getElementById('alarmTime').value = event.data.substr(2);
+                        }
                         break;
                     case 's':
+                        document.getElementById('brightnessSlider').value = event.data.substr(2);
+                        if (event.data.substr(2) > 0) {
+                            document.getElementById("lightToggle").checked = true;    
+                        } else {
+                            document.getElementById("lightToggle").checked = false;
+                        }
                         break;
                     case 'w':
+                        document.getElementById('wakeUpTime').value = (event.data.substr(2) / 60);
                         break;
                     default:
                         console.log("Received unknown message: " + event.data);
