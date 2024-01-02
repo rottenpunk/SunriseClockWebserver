@@ -10,13 +10,13 @@ R"=====(
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <style>
         .jumbotron {
-            background-image: url('sunrise.jpg'); /* Replace 'sunrise.jpg' with your image file path */
+            background-image: url('https://img.freepik.com/premium-photo/beautiful-sunrise-mountain-meadow-landscape-refreshment-with-sunshine-golden-grass_930198-1188.jpg'); /* Replace 'sunrise.jpg' with your image file path */
             background-size: cover;
             color: white;
         }
     </style>
 </head>
-<body>
+<body onload = "javascript:init()">
     <div class="jumbotron text-center">
         <h1 class="display-4">Sunrise Alarm</h1>
     </div>
@@ -24,16 +24,16 @@ R"=====(
     <div class="container mt-3">
         <form id="alarmForm">
             <div class="form-group form-check custom-control custom-switch">
-                <input type="checkbox" class="custom-control-input" id="lightToggle">
+                <input type="checkbox" class="custom-control-input" id="lightToggle" oninput="sendLightStatus()">
                 <label class="custom-control-label" for="lightToggle">Light On/Off</label>
             </div>
-            <div class="form-group form-check custom-control custom-switch">
-                <input type="checkbox" class="custom-control-input" id="alarmToggle">
-                <label class="custom-control-label" for="alarmToggle">Alarm</label>
+             <div class="form-group form-check custom-control custom-switch">
+                <input type="checkbox" class="custom-control-input" id="alarmToggle" oninput="sendAlarmStatus()">
+                <label class="custom-control-label" for="alarmToggle">Alarm On/Off</label>
             </div>
-            <div class="form-group">
+            <div class="form-group"> 
                 <label for="brightnessSlider">Brightness (0-100):</label>
-                <input type="range" class="form-control-range" id="brightnessSlider" min="0" max="100">
+                <input type="range" class="form-control-range" id="brightnessSlider" min="0" max="100" value="0" oninput="sendBrightness()">
             </div>
             <div class="form-group">
                 <label for="alarmTime">Set alarm time:</label>
@@ -54,24 +54,115 @@ R"=====(
     -->
 
     <script>
-        document.getElementById('alarmForm').addEventListener('submit', function(event) {
-            event.preventDefault(); // Prevents the default form submission
-            submitForm();
-        });
 
+        var Socket;
+        function init() {
+          
+            socket = new WebSocket('ws://' + window.location.hostname + ':81/');
+            socket.onmessage = socketRecv;
+            socket.onopen = onopen;
+            document.getElementById('alarmForm').addEventListener('submit', function(event) {
+                event.preventDefault(); // Prevents the default form submission
+                submitForm();
+            });
+            
+        }
+        
+        function onopen() {
+            // Now, ask the server to send the current values of things (brightness, 
+            // alarm time, wake time)...
+            console.log("websocket connection open");
+            socket.send("#?");
+        }
+
+        // keep getting (index):71 WebSocket is already in CLOSING or CLOSED state. error
+        function sendBrightness() {
+            var brightness = document.getElementById("brightnessSlider").value
+            if(brightness === "0") {
+                document.getElementById('lightToggle').checked = false;
+            }
+            else {
+                document.getElementById('lightToggle').checked = true;
+            }
+            socket.send('#s' + brightness);
+        }
+        
+
+        function sendLightStatus() {
+            var lightStatus = document.getElementById("lightToggle").checked
+            var brightness;
+            
+            if (lightStatus === false) {
+                document.getElementById("brightnessSlider").value = 0;
+                brightness = 0;
+            } else {
+                document.getElementById("brightnessSlider").value = 50;
+                brightness = 50;
+            }
+            
+            socket.send('#s' + brightness);
+        }
+
+        function sendAlarmStatus() {
+            var alarmStatus = document.getElementById("alarmToggle").checked
+            var newAlarmStatus;
+            
+            if (alarmStatus === false) {
+                newAlarmStatus = 'f';                        
+            } else {
+                newAlarmStatus = 'o';                        
+            }
+             
+            socket.send('#a' + newAlarmStatus);
+        }
+        
         function submitForm() {
-            var lightChecked = document.getElementById('lightToggle').checked;
-            var alarmChecked = document.getElementById('alarmToggle').checked;
-            var brightnessValue = document.getElementById('brightnessSlider').value;
+          
             var alarmTimeValue = document.getElementById('alarmTime').value;
             var wakeUpTimeValue = document.getElementById('wakeUpTime').value;
 
-            
-            console.log('Light:', lightChecked);
-            console.log('Alarm:', alarmChecked);
-            console.log('Brightness:', brightnessValue);
             console.log('Set alarm time:', alarmTimeValue);
             console.log('Wake up time in minutes:', wakeUpTimeValue);
+
+            socket.send("#a" + alarmTimeValue);
+            socket.send("#w" + wakeUpTimeValue * 60);
+            document.getElementById("alarmToggle").checked = true; 
+            alert("Alarm saved");
+        }
+
+        // This function receives a status message from webserver to update onscreen values...
+        function socketRecv(event) {
+            if (event.data[0] = '#') {
+                console.log(event.data[1]);
+                console.log(event.data.substr(2));
+                switch(event.data[1]) {
+                    case 'a':
+                        if (event.data[2] == 'o') {
+                            document.getElementById("alarmToggle").checked = true;      
+                        } else if (event.data[2] == 'f') {
+                            document.getElementById("alarmToggle").checked = false;
+                        } else {
+                            document.getElementById('alarmTime').value = event.data.substr(2);
+                        }
+                        break;
+                    case 's':
+                        document.getElementById('brightnessSlider').value = event.data.substr(2);
+                        if (event.data.substr(2) > 0) {
+                            document.getElementById("lightToggle").checked = true;    
+                        } else {
+                            document.getElementById("lightToggle").checked = false;
+                        }
+                        break;
+                    case 'w':
+                        document.getElementById('wakeUpTime').value = (event.data.substr(2) / 60);
+                        break;
+                    default:
+                        console.log("Received unknown message: " + event.data);
+                        break;
+                }
+            } else {
+                console.log("Received unknown message: " + event.data);
+            }
         }
     </script>
 </body>

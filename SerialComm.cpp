@@ -55,7 +55,7 @@ bool read_serial_input( SerialBuffer *serBuff )
 // Returns either the number response, or if error, a negative number indicat-
 // the error code (negated)... 
 //-----------------------------------------------------------------------------
-int sendCommand(COMMAND_ID command_id, int value) 
+int sendCommand(COMMAND_ID command_id, uint32_t value) 
 {
     int         timeout = 0;     // Time out counter, counting up to RESPONSE_TIMEOUT_MS.
     time_t      rawtime;
@@ -79,16 +79,23 @@ int sendCommand(COMMAND_ID command_id, int value)
                 Serial.println(temp_str);
                 break;
                 
-            case COMMAND_ID_A:                 // Set the alarm time or turn alarm on/off.
-                // one way to do it: value is the number of seconds since midnight...
-                hours = value / 3600;
-                snprintf(temp_str, sizeof(temp_str), "%02d:%02d:%02d",
-                    hours,
-                    (value - (hours * 3600)) / 60,
-                    value % 60 );
-                Serial.println(temp_str);
-                break;    
-                                
+            case COMMAND_ID_A:                 // Set the alarm time or set alarm on/off.
+                if ( value == COMMAND_ALARM_ON ) {
+                    Serial.println('o');        
+                } else if ( value == COMMAND_ALARM_OFF ) {
+                    Serial.println('f');
+                } else {
+                    // Otherwise, format alarm time from seconds into hh:mm:ss...    
+                    // one way to do it: value is the number of seconds since midnight...
+                    hours = value / 3600;
+                    snprintf(temp_str, sizeof(temp_str), "%02d:%02d:%02d",
+                        hours,
+                        (value - (hours * 3600)) / 60,
+                        value % 60 );
+                    Serial.println(temp_str);
+                }
+                break;     
+                                                
             case COMMAND_ID_S:                 // Set dim level.
                 snprintf(temp_str, sizeof(temp_str), "%03d", value);
                 Serial.println(temp_str);
@@ -110,16 +117,16 @@ int sendCommand(COMMAND_ID command_id, int value)
         }
         
         while (1) {    // We will loop, waiting for complete response.
-            delay( RESPONSE_DELAY_MS );
-            timeout += RESPONSE_DELAY_MS;  // Increment timeout value;
+            //delay( RESPONSE_DELAY_MS );
+            //timeout += RESPONSE_DELAY_MS;  // Increment timeout value;
             if ( Serial.available() && read_serial_input( &serialBuffer ) ) {
                 break;
             }
-            if (timeout > RESPONSE_TIMEOUT_MS) {
-                waiting_for_response = false;
-                Serial.println("Error: Response timeout");
-                return -(ERROR_TIMEOUT);                        
-            }
+            //if (timeout > RESPONSE_TIMEOUT_MS) {
+            //    waiting_for_response = false;
+            //    Serial.println("Error: Response timeout");
+            //    return -(ERROR_TIMEOUT);                        
+           // }
         }
 
         // Response should start with # followed by either E (error) or some number. In the case 
