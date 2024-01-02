@@ -117,16 +117,16 @@ int sendCommand(COMMAND_ID command_id, uint32_t value)
         }
         
         while (1) {    // We will loop, waiting for complete response.
-            delay( RESPONSE_DELAY_MS );
-            timeout += RESPONSE_DELAY_MS;  // Increment timeout value;
+            //delay( RESPONSE_DELAY_MS );
+            //timeout += RESPONSE_DELAY_MS;  // Increment timeout value;
             if ( Serial.available() && read_serial_input( &serialBuffer ) ) {
                 break;
             }
-            if (timeout > RESPONSE_TIMEOUT_MS) {
-                waiting_for_response = false;
-                Serial.println("Error: Response timeout");
-                return -(ERROR_TIMEOUT);                        
-            }
+            //if (timeout > RESPONSE_TIMEOUT_MS) {
+            //    waiting_for_response = false;
+            //    Serial.println("Error: Response timeout");
+            //    return -(ERROR_TIMEOUT);                        
+           // }
         }
 
         // Response should start with # followed by either E (error) or some number. In the case 

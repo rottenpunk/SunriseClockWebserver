@@ -41,8 +41,12 @@ struct config
     uint32_t alarmTime;
     bool     alarmSet;
     uint32_t wakeTime;
+    uint32_t maxBright;     // This is a scale from 1-255.
+    uint32_t minBright;     // The minimum level where bulb first turns on.
 } cfg;
 
+#define DEFAULT_MINIMUM_BRIGHTNESS   15   // This is the level right before the lightbulb turns on.
+#define DEFAULT_MAXIMUM_BRIGHTNESS  240   // This is an arbitrary max level where the bulb is max on.
 
 // Set web server port number to 80
 // WiFiServer server(80);
@@ -53,7 +57,7 @@ char dev_name[20];
 
 void setup() {
   
-    Serial.begin(9600);    // We will be talking to dimmer.
+    Serial.begin(115200);    // We will be talking to dimmer.
 
     configTime( time_zones[TIMEZONE_LOSANGELES], PREFERRED_NTP_SERVER);
   
@@ -100,6 +104,9 @@ void setup() {
     sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
     sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.     
 
+    cfg.maxBright = DEFAULT_MAXIMUM_BRIGHTNESS;
+    cfg.minBright = DEFAULT_MINIMUM_BRIGHTNESS;  
+    
     LittleFS.begin();
     restoreConfig();
 }
@@ -143,7 +150,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             switch( payload[1] ) {
                 case 's':
                     unmappedBrightness = (uint16_t) strtol((const char *) &payload[2], NULL, 10);
-                    cfg.brightness = map(unmappedBrightness, 0, 100, 0, 255);
+                    cfg.brightness = map(unmappedBrightness, 0, 100, cfg.minBright, cfg.maxBright);
                     sendCommand(COMMAND_ID_S, cfg.brightness);  // Tell dimmer to set brightness.
                     saveConfig();
                     break;
@@ -173,7 +180,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                 case '?':    // Send back complete status (brightness, alarmtime, waketime)...
                     int size;
                     // write the current brightness value...
-                    size = snprintf(buf, sizeof(buf), "#s%d", map(cfg.brightness, 0, 255, 0, 100));
+                    size = snprintf(buf, sizeof(buf), "#s%d", 
+                            map(cfg.brightness, cfg.minBright, cfg.maxBright, 0, 100));
                     webSocket.broadcastTXT(buf, size); 
                     // write the current alarmtime value ("hh:mm"...
                     hours = cfg.alarmTime / 3600;
