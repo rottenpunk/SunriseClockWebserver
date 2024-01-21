@@ -12,8 +12,10 @@
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>         // https://github.com/tzapu/WiFiManager
 #include <ESP8266mDNS.h>
+#include <WebSocketsServer.h>
 #include <time.h>
 #include <stdbool.h>
+#include "LittleFS.h"
 #include "SunriseClockWebserver.h"
 #include "webpage.h"
 
@@ -33,16 +35,29 @@ const char *time_zones[] = {
     "EST5EDT,M3.2.0,M11.1.0",   // TIMEZONE_KEYWEST
 };
 
+struct config 
+{
+    uint32_t brightness;
+    uint32_t alarmTime;
+    bool     alarmSet;
+    uint32_t wakeTime;
+    uint32_t maxBright;     // This is a scale from 1-255.
+    uint32_t minBright;     // The minimum level where bulb first turns on.
+} cfg;
+
+#define DEFAULT_MINIMUM_BRIGHTNESS   15   // This is the level right before the lightbulb turns on.
+#define DEFAULT_MAXIMUM_BRIGHTNESS  240   // This is an arbitrary max level where the bulb is max on.
 
 // Set web server port number to 80
 // WiFiServer server(80);
 ESP8266WebServer server(80);
+WebSocketsServer webSocket = WebSocketsServer(81);
 
 char dev_name[20];
 
 void setup() {
   
-    Serial.begin(9600);    // We will be talking to dimmer.
+    Serial.begin(115200);    // We will be talking to dimmer.
 
     configTime( time_zones[TIMEZONE_LOSANGELES], PREFERRED_NTP_SERVER);
   
@@ -78,45 +93,124 @@ void setup() {
   
     server.begin();
     Serial.println("HTTP server started");
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
     
     while (time(NULL) == 0) {
         Serial.println("Waiting for NTP time update");
         delay(1000);  // Wait a second until NTP has a chance to get time.
     }
-
+    
     sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
-    sendCommand(COMMAND_ID_Q, 0);   // Debug.
-    sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.   
-    sendCommand(COMMAND_ID_A, 40221);   // set alarm to 11:10:21
-    delay(1000);
-    sendCommand(COMMAND_ID_S, 80);  // test setting on light at dim level 80.
-    delay(1000);
-    sendCommand(COMMAND_ID_S, 130); // test setting on light at dim level 130.
-    delay(1000);
-    sendCommand(COMMAND_ID_F, 0);   // Light off.
+    sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.     
+
+    cfg.maxBright = DEFAULT_MAXIMUM_BRIGHTNESS;
+    cfg.minBright = DEFAULT_MINIMUM_BRIGHTNESS;  
+    
+    LittleFS.begin();
+    restoreConfig();
 }
 
 void loop()
 {
-    time_t        rawtime;       // Temporary to test time();
-    struct tm *   timeinfo;      // Temporary to test time();
-    char          buffer[80];    // Temporary to test time();
-    static time_t last_time = 0; // Temporary to test time();
-
     MDNS.update();
-
-    time(&rawtime);
-    // Debug: Display every 10 minutes...
-    if (last_time < rawtime && (rawtime % (60 * 10)) == 0) {   
-        last_time = rawtime;
-        timeinfo = localtime (&rawtime);     
-        strftime (buffer, sizeof(buffer), "Now it's %I:%M%p", timeinfo);
-        Serial.println(buffer);
-    }
-  
+    webSocket.loop(); 
     server.handleClient();
 }
 
+void saveConfig()
+{
+    File file = LittleFS.open("/ConfigFile.txt", "w");       
+    if( file ) {
+        file.write((uint8_t*)&cfg, sizeof(cfg));
+        file.close();
+    }
+}
+
+void restoreConfig()
+{
+    File file = LittleFS.open("/ConfigFile.txt", "r");       
+    if( file ) {
+        file.read((uint8_t*)&cfg, sizeof(cfg));
+        file.close();
+    }
+}
+
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
+{
+    char buf[30];
+    uint16_t unmappedBrightness;
+    uint8_t hours;
+    uint8_t minutes;
+    
+    if(type == WStype_TEXT){
+        
+        if(payload[0] == '#'){
+
+            switch( payload[1] ) {
+                case 's':
+                    unmappedBrightness = (uint16_t) strtol((const char *) &payload[2], NULL, 10);
+                    cfg.brightness = map(unmappedBrightness, 0, 100, cfg.minBright, cfg.maxBright);
+                    sendCommand(COMMAND_ID_S, cfg.brightness);  // Tell dimmer to set brightness.
+                    saveConfig();
+                    break;
+                case 'a': 
+                    if (payload[2] == 'o') {
+                        cfg.alarmSet = true;
+                        sendCommand(COMMAND_ID_A, COMMAND_ALARM_ON);
+                    } else if (payload[2] == 'f') {
+                        cfg.alarmSet = false;
+                        sendCommand(COMMAND_ID_A, COMMAND_ALARM_OFF);
+                    } else {
+                        // Alarm is hh:mm, so convert to seconds before sending...
+                        hours    = (((char)payload[2] - '0') * 10) + ((char)payload[3] - '0');
+                        minutes  = (((char)payload[5] - '0') * 10) + ((char)payload[6] - '0');
+                        cfg.alarmTime = (hours * 60 * 60) + (minutes * 60);
+                        sendCommand(COMMAND_ID_A, cfg.alarmTime); 
+                        sendCommand(COMMAND_ID_A, COMMAND_ALARM_ON);
+                        cfg.alarmSet = true;
+                    }
+                    saveConfig();
+                    break;
+                case 'w':
+                    cfg.wakeTime = (uint16_t) strtol((const char *) &payload[2], NULL, 10);            
+                    sendCommand(COMMAND_ID_W, cfg.wakeTime);  // Tell dimmer
+                    saveConfig();
+                    break;
+                case '?':    // Send back complete status (brightness, alarmtime, waketime)...
+                    int size;
+                    // write the current brightness value...
+                    size = snprintf(buf, sizeof(buf), "#s%d", 
+                            map(cfg.brightness, cfg.minBright, cfg.maxBright, 0, 100));
+                    webSocket.broadcastTXT(buf, size); 
+                    // write the current alarmtime value ("hh:mm"...
+                    hours = cfg.alarmTime / 3600;
+                    minutes = (cfg.alarmTime - (hours * 3600)) / 60;
+                    size = snprintf(buf, sizeof(buf), "#a%02d:%02d", hours, minutes);
+                    webSocket.broadcastTXT(buf, size); 
+                    // write if the alarm is set or not (what do we call this?)..
+                    if (cfg.alarmSet) {
+                        webSocket.broadcastTXT("#ao", 3);
+                    } else {
+                        webSocket.broadcastTXT("#af", 3);
+                    }                    
+                    // write the current wake time value...
+                    size = snprintf(buf, sizeof(buf), "#w%d", cfg.wakeTime);
+                    webSocket.broadcastTXT(buf, size); 
+                    break;
+                default:
+                    Serial.print("Reieved # but invalid command: ");
+                    Serial.println( payload[1] );
+                    break; 
+            }
+        } else {
+            Serial.print("We recieved: ");
+            for(int i = 0; i < length; i++)
+                Serial.print((char) payload[i]);
+            Serial.println();
+        }
+    }
+}
 
 void handle_NotFound()
 {
