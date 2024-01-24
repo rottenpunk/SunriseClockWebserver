@@ -77,7 +77,7 @@ int sendCommand(COMMAND_ID command_id, uint32_t value)
                 time (&rawtime);
                 tinfo = localtime (&rawtime);
                 snprintf(temp_str, sizeof(temp_str), "%02d:%02d:%02d", tinfo->tm_hour, tinfo->tm_min, tinfo->tm_sec);
-                Serial.println(temp_str);
+                Serial.println(temp_str);               
                 break;
                 
             case COMMAND_ID_A:                 // Set the alarm time or set alarm on/off.

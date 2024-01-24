@@ -45,7 +45,8 @@ struct config
     uint32_t minBright;     // The minimum level where bulb first turns on.
 } cfg;
 
-#define DEFAULT_MINIMUM_BRIGHTNESS   15   // This is the level right before the lightbulb turns on.
+#define DEFAULT_WAKETIME        (30*60)   // Default amount of time alarm takes to get fully bright (seconds)
+#define DEFAULT_MINIMUM_BRIGHTNESS   10   // This is the level right before the lightbulb turns on.
 #define DEFAULT_MAXIMUM_BRIGHTNESS  240   // This is an arbitrary max level where the bulb is max on.
 
 // Set web server port number to 80
@@ -95,20 +96,37 @@ void setup() {
     Serial.println("HTTP server started");
     webSocket.begin();
     webSocket.onEvent(webSocketEvent);
-    
+
+    delay(2000);  // Wait 2 seconds to let NTP get time.
     while (time(NULL) == 0) {
         Serial.println("Waiting for NTP time update");
         delay(1000);  // Wait a second until NTP has a chance to get time.
     }
-    
-    sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
-    sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.     
 
+    // Define the default values, if no config has previously been saved...
+    cfg.wakeTime  = DEFAULT_WAKETIME;
     cfg.maxBright = DEFAULT_MAXIMUM_BRIGHTNESS;
     cfg.minBright = DEFAULT_MINIMUM_BRIGHTNESS;  
-    
+
     LittleFS.begin();
     restoreConfig();
+
+    {
+        time_t t = time(NULL); 
+        struct tm *local = localtime ( &t );
+        Serial.println(asctime(local)); 
+    }
+    
+    sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
+    cfg.brightness = 0;
+    sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.     
+    sendCommand(COMMAND_ID_A, cfg.alarmTime);  // syncronize alarm time with dimmer.     
+    sendCommand(COMMAND_ID_W, cfg.wakeTime);  // syncronize alarm time with dimmer.     
+    if (cfg.alarmSet) {
+        sendCommand(COMMAND_ID_A, COMMAND_ALARM_ON);             
+    } else {
+        sendCommand(COMMAND_ID_A, COMMAND_ALARM_OFF); 
+    }
 }
 
 void loop()
@@ -178,11 +196,11 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                     saveConfig();
                     break;
                 case '?':    // Send back complete status (brightness, alarmtime, waketime)...
-                    int size;
+                    int value;
                     // write the current brightness value...
-                    size = snprintf(buf, sizeof(buf), "#s%d", 
+                    value = snprintf(buf, sizeof(buf), "#s%d", 
                             map(cfg.brightness, cfg.minBright, cfg.maxBright, 0, 100));
-                    webSocket.broadcastTXT(buf, size); 
+                    webSocket.broadcastTXT(buf, value); 
                     // write the current alarmtime value ("hh:mm"...
                     hours = cfg.alarmTime / 3600;
                     minutes = (cfg.alarmTime - (hours * 3600)) / 60;

@@ -56,6 +56,8 @@ R"=====(
     <script>
 
         var Socket;
+        var lastLightLevel = 50;
+        
         function init() {
           
             socket = new WebSocket('ws://' + window.location.hostname + ':81/');
@@ -77,7 +79,7 @@ R"=====(
 
         // keep getting (index):71 WebSocket is already in CLOSING or CLOSED state. error
         function sendBrightness() {
-            var brightness = document.getElementById("brightnessSlider").value
+            var brightness = document.getElementById("brightnessSlider").value;
             if(brightness === "0") {
                 document.getElementById('lightToggle').checked = false;
             }
@@ -93,11 +95,12 @@ R"=====(
             var brightness;
             
             if (lightStatus === false) {
+                lastLightLevel = document.getElementById("brightnessSlider").value;
                 document.getElementById("brightnessSlider").value = 0;
                 brightness = 0;
             } else {
-                document.getElementById("brightnessSlider").value = 50;
-                brightness = 50;
+                document.getElementById("brightnessSlider").value = lastLightLevel;
+                brightness = lastLightLevel;
             }
             
             socket.send('#s' + brightness);
