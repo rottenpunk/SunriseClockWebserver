@@ -204,8 +204,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                     // write the current alarmtime value ("hh:mm"...
                     hours = cfg.alarmTime / 3600;
                     minutes = (cfg.alarmTime - (hours * 3600)) / 60;
-                    size = snprintf(buf, sizeof(buf), "#a%02d:%02d", hours, minutes);
-                    webSocket.broadcastTXT(buf, size); 
+                    value = snprintf(buf, sizeof(buf), "#a%02d:%02d", hours, minutes);
+                    webSocket.broadcastTXT(buf, value); 
                     // write if the alarm is set or not (what do we call this?)..
                     if (cfg.alarmSet) {
                         webSocket.broadcastTXT("#ao", 3);
@@ -213,8 +213,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
                         webSocket.broadcastTXT("#af", 3);
                     }                    
                     // write the current wake time value...
-                    size = snprintf(buf, sizeof(buf), "#w%d", cfg.wakeTime);
-                    webSocket.broadcastTXT(buf, size); 
+                    value = snprintf(buf, sizeof(buf), "#w%d", cfg.wakeTime);
+                    webSocket.broadcastTXT(buf, value); 
                     break;
                 default:
                     Serial.print("Reieved # but invalid command: ");
