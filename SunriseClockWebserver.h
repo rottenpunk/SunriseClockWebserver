@@ -56,5 +56,6 @@ typedef struct _serial_buffer {
 
 
 int sendCommand(COMMAND_ID command_id, uint32_t value);
+bool read_serial_input( SerialBuffer *serBuff, char start_char, char *rtn_char );
 
 #endif  // SUNRISECLOCKWEBSERVER_H 
