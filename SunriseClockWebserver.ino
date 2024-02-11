@@ -15,9 +15,15 @@
 #include <WebSocketsServer.h>
 #include <time.h>
 #include <stdbool.h>
+#include <coredecls.h>  // crc32()
+#include <PolledTimeout.h>
+#include <include/WiFiState.h>  // WiFiState structure details
+
 #include "LittleFS.h"
 #include "SunriseClockWebserver.h"
 #include "webpage.h"
+   
+ADC_MODE(ADC_VCC);    // For the ESP.getVcc() to return VCC value into the chip.
 
 #define DEBUG_LOG_TIME_INTERVAL_MINUTES 5
 #define DEFAULT_DEVICE_NAME  "SunriseClock"  // Use this appended with ".local" in web browser.
@@ -159,16 +165,25 @@ void loop()
         struct tm *   timeinfo;      // Temporary to test time();
         char          buffer[80];    // Temporary to test time();
         static time_t last_time = 0; // Temporary to test time();
-        
+        static int    last_status = 0;
+        int           status;
         time(&rawtime);
-        
-        if (last_time < rawtime && (rawtime % (60 * DEBUG_LOG_TIME_INTERVAL_MINUTES)) == 0) {   
+        status = WiFi.status();
+        if ( (last_time < rawtime && (rawtime % (60 * DEBUG_LOG_TIME_INTERVAL_MINUTES)) == 0) ||
+              status != last_status)  { 
+            last_status = status;      
             last_time = rawtime;
             timeinfo = localtime (&rawtime);     
-            strftime (buffer, sizeof(buffer), "Now it's %I:%M%p", timeinfo);
+            strftime (buffer, sizeof(buffer), "%x-%I:%M%p", timeinfo);
             Serial.print(buffer);
-            Serial.print(" and wifi status: ");
-            Serial.println(WiFi.status());
+            Serial.print(" wifi: ");
+            Serial.print(status);
+            Serial.print(" free: ");
+            Serial.print(ESP.getFreeHeap());
+            Serial.print(" MHz: ");
+            Serial.print(ESP.getCpuFreqMHz());
+            Serial.print(" VCC: ");
+            Serial.println(ESP.getVcc());
         }
     }
 #endif
