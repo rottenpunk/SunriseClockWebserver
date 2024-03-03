@@ -37,13 +37,12 @@ R"=====(
             </div>
             <div class="form-group">
                 <label for="alarmTime">Set alarm time:</label>
-                <input type="time" class="form-control" id="alarmTime">
+                <input type="time" class="form-control" id="alarmTime" oninput="sendAlarmTime()">
             </div>
             <div class="form-group">
                 <label for="wakeUpTime">Wake up time in minutes:</label>
-                <input type="number" class="form-control" id="wakeUpTime" min="0">
+                <input type="number" class="form-control" id="wakeUpTime" min="0" oninput="sendWakeTime()">
             </div>
-            <button type="submit" class="btn btn-primary">Save</button>
         </form>
     </div>
 
@@ -64,6 +63,7 @@ R"=====(
             socket.onmessage = socketRecv;
             socket.onopen = onopen;
             socket.onerror = onerror;
+
             document.getElementById('alarmForm').addEventListener('submit', function(event) {
                 event.preventDefault(); // Prevents the default form submission
                 submitForm();
@@ -123,20 +123,18 @@ R"=====(
              
             socket.send('#a' + newAlarmStatus);
         }
-        
-        function submitForm() {
-          
+
+        function sendAlarmTime() {
             var alarmTimeValue = document.getElementById('alarmTime').value;
-            var wakeUpTimeValue = document.getElementById('wakeUpTime').value;
-
-            console.log('Set alarm time:', alarmTimeValue);
-            console.log('Wake up time in minutes:', wakeUpTimeValue);
-
             socket.send("#a" + alarmTimeValue);
-            socket.send("#w" + wakeUpTimeValue * 60);
-            document.getElementById("alarmToggle").checked = true; 
-            alert("Alarm saved");
+          
         }
+
+        function sendWakeTime() {
+          var wakeUpTimeValue = document.getElementById('wakeUpTime').value;
+          socket.send("#w" + wakeUpTimeValue * 60);
+        }
+        
 
         // This function receives a status message from webserver to update onscreen values...
         function socketRecv(event) {
