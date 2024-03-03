@@ -62,6 +62,8 @@ R"=====(
             socket = new WebSocket('ws://' + window.location.hostname + ':81/');
             socket.onmessage = socketRecv;
             socket.onopen = onopen;
+            socket.onerror = onerror;
+
             document.getElementById('alarmForm').addEventListener('submit', function(event) {
                 event.preventDefault(); // Prevents the default form submission
                 submitForm();
@@ -74,6 +76,10 @@ R"=====(
             // alarm time, wake time)...
             console.log("websocket connection open");
             socket.send("#?");
+        }
+
+        function onerror(error_event) {
+            alert('Websocket error: ' + event);
         }
 
         // keep getting (index):71 WebSocket is already in CLOSING or CLOSED state. error

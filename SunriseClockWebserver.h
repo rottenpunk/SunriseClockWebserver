@@ -20,7 +20,7 @@ const char * const commands[] = {
     "o",                        // Turn light fully on.                                     
     "f",                        // Turn light fully off.                                    
     "t",                        // Set current time: thh:mm:ss .                                        
-    "a",                        // Set alarm time & turn alarm on: ahh:mm:ss, or just a to turn on/off.                        
+    "a",                        // Set alarm time & turn alarm on: ahh:mm:ss, or turn alarm on/off with special value.
     "c",                        // Cancel alarm if it has been triggered.                   
     "w",                        // Set wake up time in nnnnn secs if default not desired.         
     "d",                        // Force alarm going off.                                   
@@ -33,7 +33,7 @@ typedef enum _command_id
   COMMAND_ID_O,                 // Set light fully on.
   COMMAND_ID_F,                 // Set light fully off.
   COMMAND_ID_T,                 // Set the time.
-  COMMAND_ID_A,                 // Set the alarm time or turn alarm on/off.
+  COMMAND_ID_A,                 // Set the alarm time.
   COMMAND_ID_C,                 // Cancel the alarm.
   COMMAND_ID_W,                 // Set wake up time.
   COMMAND_ID_D,                 // Force alarm going off.
@@ -42,6 +42,9 @@ typedef enum _command_id
 
 #define ERROR_TIMEOUT  100      // If we time out waiting for a response to a command sent to the dimmer.
 #define ERROR_BLOCKED  101      // Trying to send more than one command at a time to the dimmer.
+
+#define COMMAND_ALARM_ON  99999   // Because alarm time only goes up to 60*60*24=86400 secs, we can use as special code.
+#define COMMAND_ALARM_OFF 99998
 
 #define MAX_CMDLINE   50
 
@@ -52,6 +55,7 @@ typedef struct _serial_buffer {
 } SerialBuffer;
 
 
-int sendCommand(COMMAND_ID command_id, int value);
+int sendCommand(COMMAND_ID command_id, uint32_t value);
+bool read_serial_input( SerialBuffer *serBuff, char start_char, char *rtn_char );
 
 #endif  // SUNRISECLOCKWEBSERVER_H 
