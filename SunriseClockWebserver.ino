@@ -15,11 +15,17 @@
 #include <WebSocketsServer.h>
 #include <time.h>
 #include <stdbool.h>
+#include <coredecls.h>  // crc32()
+#include <PolledTimeout.h>
+#include <include/WiFiState.h>  // WiFiState structure details
+
 #include "LittleFS.h"
 #include "SunriseClockWebserver.h"
 #include "webpage.h"
+   
+ADC_MODE(ADC_VCC);    // For the ESP.getVcc() to return VCC value into the chip.
 
-
+#define DEBUG_LOG_TIME_INTERVAL_MINUTES 5
 #define DEFAULT_DEVICE_NAME  "SunriseClock"  // Use this appended with ".local" in web browser.
 #define PREFERRED_NTP_SERVER "pool.ntp.org"  
 
@@ -54,7 +60,9 @@ struct config
 ESP8266WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
-char dev_name[20];
+char         dev_name[20];
+SerialBuffer msgBuffer;      // For messages comming from the dimmer.
+void process_dimmer_message( SerialBuffer *msgBuffer );
 
 void setup() {
   
@@ -82,6 +90,8 @@ void setup() {
     Serial.println(dev_name);
     // or use this for auto generated name ESP + ChipID
     //wifiManager.autoConnect();
+    
+    WiFi.setAutoReconnect(true);
     
     if (!MDNS.begin(dev_name)) {          // Start the mDNS responder for esp8266.local
         Serial.println("Error setting up MDNS responder!");
@@ -129,12 +139,57 @@ void setup() {
     }
 }
 
+
+
 void loop()
 {
+    char c;
+    
     MDNS.update();
     webSocket.loop(); 
     server.handleClient();
+
+    // Check to see if dimmer is sending us a message...
+    if ( Serial.available() ) {
+        if ( read_serial_input( &msgBuffer, '@', &c ) ) {
+            process_dimmer_message( &msgBuffer );
+        } else {
+            Serial.print(c);
+        }
+    }
+    
+#ifdef DEBUG_LOG_TIME_INTERVAL_MINUTES
+    // Output time every so often.  
+    {
+        time_t        rawtime;       // Temporary to test time();
+        struct tm *   timeinfo;      // Temporary to test time();
+        char          buffer[80];    // Temporary to test time();
+        static time_t last_time = 0; // Temporary to test time();
+        static int    last_status = 0;
+        int           status;
+        time(&rawtime);
+        status = WiFi.status();
+        if ( (last_time < rawtime && (rawtime % (60 * DEBUG_LOG_TIME_INTERVAL_MINUTES)) == 0) ||
+              status != last_status)  { 
+            last_status = status;      
+            last_time = rawtime;
+            timeinfo = localtime (&rawtime);     
+            strftime (buffer, sizeof(buffer), "%x-%I:%M%p", timeinfo);
+            Serial.print(buffer);
+            Serial.print(" wifi: ");
+            Serial.print(status);
+            Serial.print(" free: ");
+            Serial.print(ESP.getFreeHeap());
+            Serial.print(" MHz: ");
+            Serial.print(ESP.getCpuFreqMHz());
+            Serial.print(" VCC: ");
+            Serial.println(ESP.getVcc());
+        }
+    }
+#endif
 }
+
+
 
 void saveConfig()
 {
@@ -145,6 +200,8 @@ void saveConfig()
     }
 }
 
+
+
 void restoreConfig()
 {
     File file = LittleFS.open("/ConfigFile.txt", "r");       
@@ -153,6 +210,28 @@ void restoreConfig()
         file.close();
     }
 }
+
+
+// There are a few messages that the dimmer will send us...  
+void process_dimmer_message(SerialBuffer *msgBuffer )
+{
+    char buf[30];
+    int value;
+    
+    // cmdBuffer starts with start character @...
+    switch (msgBuffer->buffer[1]) { 
+        case 's':
+            // write the current brightness value. Helpful when alarm triggered and we are fading on...
+            value = snprintf(buf, sizeof(buf), "#s%d", 
+                    map(cfg.brightness, cfg.minBright, cfg.maxBright, 0, 100));
+            webSocket.broadcastTXT(buf, value); 
+            break;
+        default:
+            break;
+    }
+}
+
+
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
 {

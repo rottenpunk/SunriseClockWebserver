@@ -24,26 +24,25 @@ static SerialBuffer serialBuffer;          // Command buffer used for collecting
 // This is pretty much the same routine used in the dimmer to read in a
 // command line one character at a time until we get a CRLF...
 //-----------------------------------------------------------------------------
-bool read_serial_input( SerialBuffer *serBuff )
+bool read_serial_input( SerialBuffer *serBuff, char start_char, char *rtn_char )
 {
-    char c;
 
-    c = Serial.read();
+    *rtn_char = Serial.read();
     
     //Serial.println((uint8_t)c, HEX);
 
-    if (serBuff->index == 0 && c != '#') {
-        // Ignore anything before the '#' (which could be a '>').
-    } else if (c == '\r') {             // LF?
+    if (serBuff->index == 0 && *rtn_char != start_char) {
+        // Ignore anything before the start character (# or @)...
+    } else if (*rtn_char == '\r') {             // LF?
         // null terminate line. 
         serBuff->buffer[serBuff->index] = 0;  
         serBuff->index = 0;      // reset command line index.
         return true;
-    } else if (c == '\n') {      // CR? 
+    } else if (*rtn_char == '\n') {      // CR? 
         // Ignore CRs...
     } else {                     // Anything else, add to cmd buff if not full...
         if (serBuff->index < MAX_CMDLINE - 1) {
-            serBuff->buffer[serBuff->index++] = c;  
+            serBuff->buffer[serBuff->index++] = *rtn_char;  
         }
     }
 
@@ -64,6 +63,7 @@ int sendCommand(COMMAND_ID command_id, uint32_t value)
     char        temp_str[MAX_TEMP_BUFFER];
     int         rc = 0;
     int         hours;
+    char        c;
     
     if (!waiting_for_response) {
         //waiting_for_response = true;  // Indicate waiting for response.
@@ -123,7 +123,7 @@ int sendCommand(COMMAND_ID command_id, uint32_t value)
         
         while (1) {    // We will loop, waiting for complete response.
 
-            if ( Serial.available() && read_serial_input( &serialBuffer ) ) {
+            if ( Serial.available() && read_serial_input( &serialBuffer, '#', &c ) ) {
                 break;
             }
             yield();
