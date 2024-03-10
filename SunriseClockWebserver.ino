@@ -25,6 +25,7 @@
    
 ADC_MODE(ADC_VCC);    // For the ESP.getVcc() to return VCC value into the chip.
 
+#define WIFI_AUTOCONNECT_TIMEOUT        480  // Allow only 8 minutes to autoconnect.
 #define DEBUG_LOG_TIME_INTERVAL_MINUTES 5
 #define DEFAULT_DEVICE_NAME  "SunriseClock"  // Use this appended with ".local" in web browser.
 #define PREFERRED_NTP_SERVER "pool.ntp.org"  
@@ -49,6 +50,7 @@ struct config
     uint32_t wakeTime;
     uint32_t maxBright;     // This is a scale from 1-255.
     uint32_t minBright;     // The minimum level where bulb first turns on.
+    char     devNamePostfix; // Added character to device name (SunriseClockx.local)
 } cfg;
 
 #define DEFAULT_WAKETIME        (30*60)   // Default amount of time alarm takes to get fully bright (seconds)
@@ -60,7 +62,7 @@ struct config
 ESP8266WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
-char         dev_name[20];
+char         dev_name[64];
 SerialBuffer msgBuffer;      // For messages comming from the dimmer.
 void process_dimmer_message( SerialBuffer *msgBuffer );
 
@@ -69,6 +71,9 @@ void setup() {
     Serial.begin(115200);    // We will be talking to dimmer.
 
     configTime( time_zones[TIMEZONE_LOSANGELES], PREFERRED_NTP_SERVER);
+
+    LittleFS.begin();       // Initialize file system so we can use it.
+    restoreConfig();        // Restore a previously saved configuration.
   
     // WiFiManager
     // Local intialization. Once its business is done, there is no need to keep it around
@@ -85,7 +90,28 @@ void setup() {
     // device name and goes into a blocking loop awaiting configuration
     //sprintf(dev_name, "ESP%06X", ESP.getChipId()); 
     strcpy(dev_name, DEFAULT_DEVICE_NAME);
-    wifiManager.autoConnect(dev_name);
+    
+    // If a device name postfix character was configured, concatenate it to device name.
+    // Use @x to configure a postfix character.  This is helpful if you have more than
+    // one SunriseClock on your network...
+    if (cfg.devNamePostfix > ' ') {
+        dev_name[strlen(dev_name)] = cfg.devNamePostfix;
+        dev_name[strlen(dev_name) + 1] = '/0'; // Null terminate new name.
+    }
+
+    // What if you've recently changed your WiFi and now can't get connected?
+    // Wait the timeout value and then it will reset the previously saved WiFi
+    // Name and Password so you can reconnect with the WiFiManager portal with
+    // your cell phone (unless your still using your old flip-phone!)...
+    wifiManager.setTimeout(WIFI_AUTOCONNECT_TIMEOUT);   // Set timeout value 
+    if (!wifiManager.autoConnect(dev_name)) {
+        Serial.println("Failed to connect to WiFi in time. Clearing WiFi settings");
+        delay(3000);
+        wifiManager.resetSettings();        
+        ESP.restart();
+        delay(6000);
+    }
+    
     Serial.print("Device name: ");
     Serial.println(dev_name);
     // or use this for auto generated name ESP + ChipID
@@ -118,15 +144,11 @@ void setup() {
     cfg.maxBright = DEFAULT_MAXIMUM_BRIGHTNESS;
     cfg.minBright = DEFAULT_MINIMUM_BRIGHTNESS;  
 
-    LittleFS.begin();
-    restoreConfig();
+    time_t t = time(NULL); 
+    struct tm *local = localtime ( &t );
+    Serial.println(asctime(local)); 
 
-    {
-        time_t t = time(NULL); 
-        struct tm *local = localtime ( &t );
-        Serial.println(asctime(local)); 
-    }
-    
+    // Now, get in sync with the dimmer...
     sendCommand(COMMAND_ID_F, 0);   // Make sure light is off to begin with.
     cfg.brightness = 0;
     sendCommand(COMMAND_ID_T, 0);   // syncronize time with dimmer.     
@@ -137,6 +159,8 @@ void setup() {
     } else {
         sendCommand(COMMAND_ID_A, COMMAND_ALARM_OFF); 
     }
+
+
 }
 
 
@@ -225,6 +249,12 @@ void process_dimmer_message(SerialBuffer *msgBuffer )
             value = snprintf(buf, sizeof(buf), "#s%d", 
                     map(cfg.brightness, cfg.minBright, cfg.maxBright, 0, 100));
             webSocket.broadcastTXT(buf, value); 
+            break;
+        case 'x':
+            cfg.devNamePostfix = msgBuffer->buffer[2];
+            saveConfig();
+            Serial.print("Device Postfix set to: ");
+            Serial.print(msgBuffer->buffer[2]);
             break;
         default:
             break;
